@@ -1,0 +1,27 @@
+# Git and IDE
+.git
+.gitignore
+.cursor
+*.swp
+*~
+
+# Build and deps (rebuilt in container)
+_build
+deps
+.elixir_ls
+
+# Test and docs (not needed in image)
+test
+*.md
+.env
+.env.*
+!.env.example
+
+# Deploy and local dev
+deploy
+Makefile
+start_nats.sh
+terminals
+
+# Misc (keep mix.lock for reproducible deps)
+.formatter.exs

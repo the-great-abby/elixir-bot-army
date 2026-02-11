@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bot-army
+  namespace: bot-army
+  labels:
+    app: bot-army
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bot-army
+  template:
+    metadata:
+      labels:
+        app: bot-army
+    spec:
+      containers:
+        - name: bot-army
+          image: bot-army:latest
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: bot-army
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          # Optional: add liveness/readiness when you have a health RPC, e.g.:
+          # livenessProbe:
+          #   exec:
+          #     command: ["/app/bin/bot_army", "rpc", "Code.ensure_loaded?(BotArmy.Application)"]
+          #   initialDelaySeconds: 30
+          #   periodSeconds: 30

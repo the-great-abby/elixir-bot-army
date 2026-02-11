@@ -1,0 +1,48 @@
+---
+description: Keep files under 500 lines for maintainability
+alwaysApply: true
+---
+
+# File Size Limits
+
+Keep files small and focused for maintainability.
+
+## Guidelines
+
+- **Target**: Under 500 lines per file
+- **Warning**: Files over 300 lines should be reviewed for splitting
+- **Critical**: Files over 500 lines must be refactored
+
+## When a File Gets Too Large
+
+1. **Identify responsibilities** - Does this file do multiple things?
+2. **Extract modules** - Move related functions to new modules
+3. **Use behaviors** - Share common patterns via behaviors
+
+## Refactoring Strategies
+
+### Extract by Domain
+
+```elixir
+# Before: lib/bot_army/bots/trading_bot.ex (600 lines)
+
+# After: Split into focused modules
+# lib/bot_army/bots/trading_bot.ex          (~150 lines, main logic)
+# lib/bot_army/bots/trading_bot/orders.ex   (~150 lines, order handling)
+# lib/bot_army/bots/trading_bot/analysis.ex (~150 lines, market analysis)
+# lib/bot_army/bots/trading_bot/risk.ex     (~100 lines, risk management)
+```
+
+### Extract Shared Utilities
+
+```elixir
+# Common patterns across bots -> lib/bot_army/utils/
+# lib/bot_army/utils/event_helpers.ex
+# lib/bot_army/utils/nats_helpers.ex
+```
+
+## Exceptions
+
+Some files may exceed 500 lines with justification:
+- Generated code (document in comments)
+- Test files with extensive fixtures (prefer separate fixture files)

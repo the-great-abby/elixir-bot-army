@@ -1,0 +1,165 @@
+╔══════════════════════════════════════════════════════════════════╗
+║                    🤖 BotArmy - Getting Started                  ║
+╚══════════════════════════════════════════════════════════════════╝
+
+Your Elixir bot army is ready! Here's what we built:
+
+┌──────────────────────────────────────────────────────────────────┐
+│ 📚 DOCUMENTATION (Read these in order)                           │
+├──────────────────────────────────────────────────────────────────┤
+│ 1. QUICKSTART.md    → Get running in 3 minutes                   │
+│ 2. README.md        → Full documentation                         │
+│ 3. CHEATSHEET.md    → Quick command reference                    │
+│ 4. ARCHITECTURE.md  → Technical deep dive                        │
+│ 5. PROJECT_SUMMARY.md → Complete overview                        │
+└──────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│ 🚀 THREE-STEP QUICKSTART                                         │
+├──────────────────────────────────────────────────────────────────┤
+│ 1. Start NATS:                                                   │
+│    ./start_nats.sh                                               │
+│                                                                  │
+│ 2. Start BotArmy:                                                │
+│    iex -S mix                                                    │
+│                                                                  │
+│ 3. Run demo:                                                     │
+│    BotArmy.Demo.run_demo()                                       │
+└──────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│ 🤖 YOUR BOT ARMY                                                 │
+├──────────────────────────────────────────────────────────────────┤
+│ ✓ JournalBot      → Track journal entries & life events         │
+│ ✓ SREBot          → Monitor system health & alerts              │
+│ ✓ FinanceBot      → Track finances & transactions               │
+│ ✓ TradingBot      → Monitor trading signals & market data       │
+│ ⭐ PonderingBot   → Autonomous pattern detection (every 5min)   │
+│ ⭐ Orchestrator   → Fast user queries (instant responses)       │
+└──────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│ 💡 KEY CONCEPTS                                                  │
+├──────────────────────────────────────────────────────────────────┤
+│ • Event-driven architecture via NATS                             │
+│ • Each bot is a GenServer (supervised OTP process)               │
+│ • Two-layer intelligence:                                        │
+│   - PonderingBot: Slow, deep background analysis                 │
+│   - Orchestrator: Fast, focused on-demand queries                │
+│ • ~100MB total memory footprint                                  │
+│ • Easy to extend with new bots                                   │
+└──────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│ 🎯 QUICK COMMANDS                                                │
+├──────────────────────────────────────────────────────────────────┤
+│ BotArmy.Demo.journal("text", "mood")                             │
+│ BotArmy.Demo.health_check()                                      │
+│ BotArmy.Demo.spend(50.00, "category")                            │
+│ BotArmy.Demo.price("AAPL", 175.50)                               │
+│ BotArmy.Demo.ask("What insights?")                               │
+│ BotArmy.Demo.show_stats()                                        │
+│                                                                  │
+│ See CHEATSHEET.md for complete reference!                        │
+└──────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│ 📁 PROJECT STRUCTURE                                             │
+├──────────────────────────────────────────────────────────────────┤
+│ lib/bot_army/                                                    │
+│   ├── application.ex       # OTP supervision tree                │
+│   ├── bot.ex              # Base bot behavior                    │
+│   ├── event.ex            # Event structure                      │
+│   ├── demo.ex             # Demo interface                       │
+│   └── bots/               # All 6 specialized bots               │
+│       ├── journal_bot.ex                                         │
+│       ├── sre_bot.ex                                             │
+│       ├── finance_bot.ex                                         │
+│       ├── trading_bot.ex                                         │
+│       ├── pondering_bot.ex                                       │
+│       └── orchestrator.ex                                        │
+└──────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│ 🔧 DEPENDENCIES                                                  │
+├──────────────────────────────────────────────────────────────────┤
+│ • Elixir 1.17+ / Erlang 27+ (installed via mise)                 │
+│ • NATS server (via Docker or Homebrew)                           │
+│ • gnat (NATS client library)                                     │
+│ • jason (JSON encoding)                                          │
+│ • postgrex (future: event persistence)                           │
+└──────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│ 🎓 LEARNING PATH                                                 │
+├──────────────────────────────────────────────────────────────────┤
+│ 1. Run the demo (BotArmy.Demo.run_demo())                        │
+│ 2. Try individual commands (see CHEATSHEET.md)                   │
+│ 3. Watch events in real-time:                                    │
+│    docker exec -it nats-dev nats sub ">"                         │
+│ 4. Check bot statistics (BotArmy.Demo.show_stats())              │
+│ 5. Read the architecture (ARCHITECTURE.md)                       │
+│ 6. Extend with your own bot (README.md has guide)                │
+└──────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│ 🌟 NEXT STEPS                                                    │
+├──────────────────────────────────────────────────────────────────┤
+│ Phase 1: Add AI Intelligence                                     │
+│   □ Integrate Claude API for PonderingBot                        │
+│   □ Integrate Ollama for Orchestrator                            │
+│                                                                  │
+│ Phase 2: Add Persistence                                         │
+│   □ Connect to Postgres                                          │
+│   □ Store events for historical queries                          │
+│                                                                  │
+│ Phase 3: Build UI                                                │
+│   □ Phoenix LiveView dashboard                                   │
+│   □ Real-time event visualization                                │
+│                                                                  │
+│ Phase 4: Production Deploy                                       │
+│   □ Dockerize application                                        │
+│   □ Deploy to Kubernetes                                         │
+└──────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│ ⚠️  TROUBLESHOOTING                                              │
+├──────────────────────────────────────────────────────────────────┤
+│ Problem: NATS connection failed                                  │
+│ Solution: Run ./start_nats.sh first                              │
+│                                                                  │
+│ Problem: Compilation warnings                                    │
+│ Solution: Safe to ignore (minor unused variable warnings)        │
+│                                                                  │
+│ Problem: Bots not receiving events                               │
+│ Solution: Check BotArmy.Demo.show_stats() for subscriptions      │
+└──────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│ 💻 USEFUL COMMANDS                                               │
+├──────────────────────────────────────────────────────────────────┤
+│ # Compile project                                                │
+│ mix compile                                                      │
+│                                                                  │
+│ # Run tests                                                      │
+│ mix test                                                         │
+│                                                                  │
+│ # Start with interactive shell                                   │
+│ iex -S mix                                                       │
+│                                                                  │
+│ # Format code                                                    │
+│ mix format                                                       │
+│                                                                  │
+│ # Check dependencies                                             │
+│ mix deps                                                         │
+└──────────────────────────────────────────────────────────────────┘
+
+╔══════════════════════════════════════════════════════════════════╗
+║                      Ready to go! 🚀                             ║
+║                                                                  ║
+║  Start with: ./start_nats.sh && iex -S mix                      ║
+║  Then run:   BotArmy.Demo.run_demo()                            ║
+║                                                                  ║
+║  Have fun building your bot army! 🤖                             ║
+╚══════════════════════════════════════════════════════════════════╝
+

@@ -1,0 +1,43 @@
+---
+description: Keep documentation in sync with code changes
+alwaysApply: true
+---
+
+# Documentation Sync
+
+When implementing or modifying features, keep documentation updated.
+
+## Required Updates
+
+When changing code in `lib/`:
+- Update relevant sections in `README.md`, `ARCHITECTURE.md`, or `QUICKSTART.md`
+- Add new features to `CHEATSHEET.md` if applicable
+- Document new environment variables in `.env.example`
+
+## Checklist
+
+Before completing any feature work:
+- [ ] Public API changes documented
+- [ ] New modules/bots have docstrings (`@moduledoc`, `@doc`)
+- [ ] New config options added to `.env.example` with comments
+- [ ] Architecture changes reflected in `ARCHITECTURE.md`
+
+## Example
+
+```elixir
+# When adding a new bot, include module documentation:
+defmodule BotArmy.Bots.NewBot do
+  @moduledoc """
+  Handles [describe purpose].
+
+  ## Configuration
+  - `NEW_BOT_INTERVAL` - How often to run (default: 5 minutes)
+
+  ## Events
+  - Subscribes to: `some.event`
+  - Publishes: `new_bot.result`
+  """
+end
+```
+
+Then update `ARCHITECTURE.md` with the new bot's role in the system.

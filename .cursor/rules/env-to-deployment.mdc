@@ -1,0 +1,71 @@
+---
+description: Pass .env values to Kubernetes and Docker configs
+globs: "{deploy/**/*.yaml,**/Dockerfile,docker-compose*.yml,**/*.sh}"
+alwaysApply: false
+---
+
+# Environment Variables in Deployment
+
+Keep `.env`, Kubernetes configs, and Docker files in sync.
+
+## Source of Truth
+
+`.env.example` is the canonical list of environment variables.
+
+## Kubernetes ConfigMap
+
+When adding new env vars, update `deploy/kubernetes/bot-army-configmap.yaml`:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bot-army-config
+  namespace: bot-army
+data:
+  NATS_HOST: "nats"
+  NATS_PORT: "4222"
+  PONDER_INTERVAL_MINUTES: "5"
+  # Add new variables here with sensible defaults
+```
+
+## Kubernetes Deployment
+
+Reference ConfigMap in `deploy/kubernetes/bot-army-deployment.yaml`:
+
+```yaml
+env:
+  - name: NATS_HOST
+    valueFrom:
+      configMapKeyRef:
+        name: bot-army-config
+        key: NATS_HOST
+```
+
+For secrets (API keys, passwords), use Kubernetes Secrets instead:
+
+```yaml
+env:
+  - name: CLAUDE_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: bot-army-secrets
+        key: claude-api-key
+```
+
+## Dockerfile
+
+Pass build-time args for values needed during build:
+
+```dockerfile
+ARG NATS_HOST=localhost
+ENV NATS_HOST=${NATS_HOST}
+```
+
+## Checklist
+
+When adding a new environment variable:
+- [ ] Added to `.env.example` with description
+- [ ] Added to `deploy/kubernetes/bot-army-configmap.yaml` (or Secrets for sensitive values)
+- [ ] Referenced in `deploy/kubernetes/bot-army-deployment.yaml`
+- [ ] Documented in `deploy/README.md`

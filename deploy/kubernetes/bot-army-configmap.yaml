@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bot-army
+  namespace: bot-army
+  labels:
+    app: bot-army
+data:
+  NATS_HOST: "nats"
+  NATS_PORT: "4222"

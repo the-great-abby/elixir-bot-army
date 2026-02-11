@@ -1,0 +1,55 @@
+---
+description: Test-Driven Development practices for Elixir
+globs: "{lib,test}/**/*.{ex,exs}"
+alwaysApply: false
+---
+
+# TDD Development
+
+Follow Test-Driven Development when implementing features.
+
+## Workflow
+
+1. **Write the test first** - Define expected behavior before implementation
+2. **Run test, see it fail** - Confirm the test catches the missing behavior
+3. **Implement minimal code** - Just enough to make the test pass
+4. **Refactor** - Clean up while keeping tests green
+
+## Test Structure
+
+```elixir
+# test/bot_army/bots/new_bot_test.exs
+defmodule BotArmy.Bots.NewBotTest do
+  use ExUnit.Case, async: true
+
+  describe "handle_event/1" do
+    test "processes valid events" do
+      event = %BotArmy.Event{type: "test.event", payload: %{}}
+      assert {:ok, _result} = NewBot.handle_event(event)
+    end
+
+    test "returns error for invalid events" do
+      assert {:error, :invalid_event} = NewBot.handle_event(nil)
+    end
+  end
+end
+```
+
+## Commands
+
+```bash
+# Run all tests
+mix test
+
+# Run specific test file
+mix test test/bot_army/bots/new_bot_test.exs
+
+# Run with coverage
+mix test --cover
+```
+
+## Before Submitting Code
+
+- [ ] All new functions have corresponding tests
+- [ ] Tests run and pass: `mix test`
+- [ ] No skipped tests without explanation

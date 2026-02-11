@@ -23,6 +23,7 @@ defmodule BotArmy.Bot do
       @impl GenServer
       def init(opts) do
         gnat = Keyword.get(opts, :gnat)
+        Process.put(:"#{__MODULE__}.gnat", gnat)
 
         # Subscribe to patterns defined by the bot
         Enum.each(subscribe_patterns(), fn pattern ->
@@ -34,7 +35,7 @@ defmodule BotArmy.Bot do
       end
 
       @impl GenServer
-      def handle_info({:msg, %{topic: topic, body: body}}, state) do
+      def handle_info({:msg, %{topic: _topic, body: body}}, state) do
         case Event.decode(body) do
           {:ok, event} ->
             Logger.debug("#{bot_name()} received event: #{event.subject}")
@@ -49,20 +50,29 @@ defmodule BotArmy.Bot do
 
       @impl GenServer
       def handle_call(:stats, _from, state) do
-        stats = %{
+        {:reply, get_stats(state), state}
+      end
+
+      def get_stats(state) do
+        %{
           bot: bot_name(),
           events_processed: state.events_processed,
           subscriptions: subscribe_patterns()
         }
-        {:reply, stats, state}
       end
 
-      # Helper function for publishing events
+      # Helper function for publishing events (safe to call from inside the bot process)
       def publish_event(subject, data) do
         event = Event.new(subject, data, bot_name())
         payload = Event.encode(event)
 
-        gnat = GenServer.call(__MODULE__, :get_gnat)
+        gnat =
+          if self() == Process.whereis(__MODULE__) do
+            Process.get(:"#{__MODULE__}.gnat")
+          else
+            GenServer.call(__MODULE__, :get_gnat)
+          end
+
         case Gnat.pub(gnat, subject, payload) do
           :ok ->
             Logger.debug("#{bot_name()} published: #{subject}")
@@ -83,7 +93,7 @@ defmodule BotArmy.Bot do
         GenServer.call(__MODULE__, :stats)
       end
 
-      defoverridable handle_info: 2
+      defoverridable init: 1, handle_info: 2, get_stats: 1
     end
   end
 end

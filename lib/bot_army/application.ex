@@ -6,6 +6,9 @@ defmodule BotArmy.Application do
   use Application
   require Logger
 
+  @nats_retries 10
+  @nats_retry_ms 1_000
+
   @impl true
   def start(_type, _args) do
     # Get NATS connection settings from config or environment
@@ -14,8 +17,34 @@ defmodule BotArmy.Application do
 
     Logger.info("🚀 Starting BotArmy with NATS at #{nats_host}:#{nats_port}")
 
+    case wait_for_nats(nats_host, nats_port, @nats_retries) do
+      :ok ->
+        start_supervisor(nats_host, nats_port)
+      {:error, _} ->
+        Logger.error("""
+        ❌ NATS is not running at #{nats_host}:#{nats_port}.
+        Start NATS first in another terminal: make nats
+        """)
+        {:error, :nats_unavailable}
+    end
+  end
+
+  defp wait_for_nats(_host, _port, 0), do: {:error, :timeout}
+
+  defp wait_for_nats(host, port, tries) do
+    case :gen_tcp.connect(to_charlist(host), port, [], 2_000) do
+      {:ok, sock} ->
+        :gen_tcp.close(sock)
+        :ok
+      _ ->
+        Process.sleep(@nats_retry_ms)
+        wait_for_nats(host, port, tries - 1)
+    end
+  end
+
+  defp start_supervisor(nats_host, nats_port) do
     children = [
-      # NATS connection
+      # NATS connection (connects asynchronously; :gnat is registered when ready)
       %{
         id: :gnat,
         start: {Gnat.ConnectionSupervisor, :start_link,
@@ -26,6 +55,8 @@ defmodule BotArmy.Application do
                   ]
                 }]}
       },
+      # Gate: wait for :gnat to be registered before starting bots (avoids :noproc)
+      {BotArmy.NatsReady, [gnat_name: :gnat]},
 
       # All the bots
       {BotArmy.Bots.JournalBot, [gnat: :gnat]},

@@ -15,8 +15,8 @@ help:
 	@echo ""
 	@echo "  make deps         Get Mix dependencies"
 	@echo "  make nats         Start NATS server (Docker)"
-	@echo "  make run          Start app in IEx (iex -S mix)"
-	@echo "  make test         Run tests"
+	@echo "  make run          Start app in IEx (requires NATS: run 'make nats' in another terminal)"
+	@echo "  make test         Run tests (no NATS needed)"
 	@echo "  make format       Format code"
 	@echo "  make compile      Compile the project"
 	@echo "  make clean        Clean build artifacts"
@@ -111,3 +111,6 @@ k8s-deploy-app:
 
 k8s-destroy:
 	kubectl delete namespace $(K8S_NAMESPACE) --ignore-not-found
+
+# Common typo
+k8s-destory: k8s-destroy

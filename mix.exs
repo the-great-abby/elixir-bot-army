@@ -23,10 +23,13 @@ defmodule BotArmy.MixProject do
 
   # Run "mix help compile.app" to learn about applications.
   def application do
-    [
-      extra_applications: [:logger],
-      mod: {BotArmy.Application, []}
-    ]
+    base = [extra_applications: [:logger]]
+    # In test we don't start the app so tests can run without NATS
+    if Mix.env() == :test do
+      base
+    else
+      Keyword.put(base, :mod, {BotArmy.Application, []})
+    end
   end
 
   # Run "mix help deps" to learn about dependencies.

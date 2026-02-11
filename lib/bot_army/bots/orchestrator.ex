@@ -22,6 +22,7 @@ defmodule BotArmy.Bots.Orchestrator do
   @impl GenServer
   def init(opts) do
     gnat = Keyword.get(opts, :gnat)
+    Process.put(:"#{__MODULE__}.gnat", gnat)
 
     # Subscribe to patterns
     Enum.each(subscribe_patterns(), fn pattern ->
@@ -38,7 +39,7 @@ defmodule BotArmy.Bots.Orchestrator do
   end
 
   @impl GenServer
-  def handle_info({:msg, %{topic: topic, body: body}}, state) do
+  def handle_info({:msg, %{topic: _topic, body: body}}, state) do
     case BotArmy.Event.decode(body) do
       {:ok, event} ->
         new_state = cond do
@@ -152,16 +153,14 @@ defmodule BotArmy.Bots.Orchestrator do
     {:reply, summary, state}
   end
 
-  @impl GenServer
-  def handle_call(:stats, _from, state) do
-    stats = %{
+  def get_stats(state) do
+    %{
       bot: bot_name(),
       events_processed: state.events_processed,
       recent_events_cached: length(state.recent_events),
       insights_cached: length(state.insights),
       subscriptions: subscribe_patterns()
     }
-    {:reply, stats, state}
   end
 
   # Private helpers

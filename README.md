@@ -39,7 +39,7 @@ Supervision tree manages everything
   - Runs periodic "ponder loops" (every 5 minutes)
   - Looks for emergent patterns across all bots
   - Publishes insights when detected
-- **Use case:** Cloud models (not urgent, thoughtful)
+- **Use case:** Local Ollama (not urgent, thoughtful)
 
 ### Orchestrator (User-Initiated, Interactive)
 - **Subscribes to:** All events + `ponder.insight.*`
@@ -49,7 +49,7 @@ Supervision tree manages everything
   - Fetches specific context on-demand
   - Synthesizes focused answers
   - Uses insights from PonderingBot
-- **Use case:** Local Ollama (fast response required)
+- **Use case:** Cloud models (fast response required)
 
 ## Event Bus Pattern
 

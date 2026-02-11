@@ -24,6 +24,7 @@ defmodule BotArmy.Bots.PonderingBot do
   @impl GenServer
   def init(opts) do
     gnat = Keyword.get(opts, :gnat)
+    Process.put(:"#{__MODULE__}.gnat", gnat)
 
     # Subscribe to all events
     Enum.each(subscribe_patterns(), fn pattern ->
@@ -62,7 +63,7 @@ defmodule BotArmy.Bots.PonderingBot do
   end
 
   @impl GenServer
-  def handle_info({:msg, %{topic: topic, body: body}}, state) do
+  def handle_info({:msg, %{topic: _topic, body: body}}, state) do
     case BotArmy.Event.decode(body) do
       {:ok, event} ->
         # Don't log every event (too noisy), just buffer them
@@ -144,15 +145,13 @@ defmodule BotArmy.Bots.PonderingBot do
     {:reply, length(state.event_buffer), state}
   end
 
-  @impl GenServer
-  def handle_call(:stats, _from, state) do
-    stats = %{
+  def get_stats(state) do
+    %{
       bot: bot_name(),
       events_processed: state.events_processed,
       buffer_size: length(state.event_buffer),
       insights_found: state.insights_found,
       subscriptions: subscribe_patterns()
     }
-    {:reply, stats, state}
   end
 end

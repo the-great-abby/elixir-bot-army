@@ -1,0 +1,520 @@
+# Bot Army - Service Management
+# Usage: make <target> SERVICE=<service_name>
+# Example: make deploy SERVICE=llm_proxy
+#          make logs SERVICE=sre_bot
+#          make status (shows all services)
+
+# ============================================================
+# Configuration
+# ============================================================
+
+SERVICES_DIR := $(HOME)/services
+DEV_DIR      := $(HOME)/dev
+LOGS_DIR     := $(HOME)/logs
+SCRIPTS_DIR  := $(HOME)/scripts
+LAUNCH_AGENTS := $(HOME)/Library/LaunchAgents
+LABEL_PREFIX := com.botarmy
+
+# Colors for output
+RED    := \033[0;31m
+GREEN  := \033[0;32m
+YELLOW := \033[0;33m
+BLUE   := \033[0;34m
+PURPLE := \033[0;35m
+CYAN   := \033[0;36m
+RESET  := \033[0m
+
+# All known services and their types
+ELIXIR_SERVICES := llm_proxy gtd_bot admin_ui
+GO_SERVICES     := sre_bot
+ALL_SERVICES    := $(ELIXIR_SERVICES) $(GO_SERVICES)
+
+# ============================================================
+# Help
+# ============================================================
+
+.DEFAULT_GOAL := help
+
+help:
+	@echo "$(CYAN)╔════════════════════════════════════════════╗$(RESET)"
+	@echo "$(CYAN)║         Bot Army - Control Panel           ║$(RESET)"
+	@echo "$(CYAN)╚════════════════════════════════════════════╝$(RESET)"
+	@echo ""
+	@echo "$(YELLOW)Service Commands (require SERVICE=name):$(RESET)"
+	@echo "  $(GREEN)make build$(RESET)    SERVICE=llm_proxy   - Build service"
+	@echo "  $(GREEN)make deploy$(RESET)   SERVICE=llm_proxy   - Build + install + restart"
+	@echo "  $(GREEN)make start$(RESET)    SERVICE=llm_proxy   - Start service"
+	@echo "  $(GREEN)make stop$(RESET)     SERVICE=llm_proxy   - Stop service"
+	@echo "  $(GREEN)make restart$(RESET)  SERVICE=llm_proxy   - Restart service"
+	@echo "  $(GREEN)make logs$(RESET)     SERVICE=llm_proxy   - Tail logs"
+	@echo "  $(GREEN)make install$(RESET)  SERVICE=llm_proxy   - Register with launchctl"
+	@echo "  $(GREEN)make uninstall$(RESET) SERVICE=llm_proxy  - Unregister from launchctl"
+	@echo ""
+	@echo "$(YELLOW)Fleet Commands (all services):$(RESET)"
+	@echo "  $(GREEN)make status$(RESET)                       - Show all service status"
+	@echo "  $(GREEN)make start-all$(RESET)                    - Start all services"
+	@echo "  $(GREEN)make stop-all$(RESET)                     - Stop all services"
+	@echo "  $(GREEN)make restart-all$(RESET)                  - Restart all services"
+	@echo "  $(GREEN)make deploy-all$(RESET)                   - Deploy all services"
+	@echo "  $(GREEN)make health$(RESET)                       - Health check all services"
+	@echo ""
+	@echo "$(YELLOW)Pause Controls:$(RESET)"
+	@echo "  $(GREEN)make pause$(RESET)    SERVICE=trading      - Pause a domain"
+	@echo "  $(GREEN)make resume$(RESET)   SERVICE=trading      - Resume a domain"
+	@echo "  $(GREEN)make pause-all$(RESET)                    - Pause everything"
+	@echo "  $(GREEN)make resume-all$(RESET)                   - Resume everything"
+	@echo "  $(GREEN)make pause-llm$(RESET)                    - Pause all LLM requests"
+	@echo "  $(GREEN)make resume-llm$(RESET)                   - Resume all LLM requests"
+	@echo ""
+	@echo "$(YELLOW)Setup Commands:$(RESET)"
+	@echo "  $(GREEN)make setup$(RESET)                        - Initial setup (run once)"
+	@echo "  $(GREEN)make setup-service$(RESET) SERVICE=name   - Setup new service"
+	@echo ""
+	@echo "$(YELLOW)Available Services:$(RESET)"
+	@echo "  Elixir: $(ELIXIR_SERVICES)"
+	@echo "  Go:     $(GO_SERVICES)"
+
+# ============================================================
+# Setup
+# ============================================================
+
+setup:
+	@echo "$(CYAN)Setting up Bot Army infrastructure...$(RESET)"
+	@mkdir -p $(SERVICES_DIR)
+	@mkdir -p $(LOGS_DIR)
+	@mkdir -p $(SCRIPTS_DIR)
+	@for svc in $(ALL_SERVICES); do \
+		mkdir -p $(SERVICES_DIR)/$$svc; \
+		mkdir -p $(LOGS_DIR)/$$svc; \
+	done
+	@echo "$(GREEN)✓ Directory structure created$(RESET)"
+	@echo "$(YELLOW)Next steps:$(RESET)"
+	@echo "  1. Configure secrets: make setup-secrets"
+	@echo "  2. Setup each service: make setup-service SERVICE=<name>"
+
+setup-service:
+	@$(call require_service)
+	@echo "$(CYAN)Setting up service: $(SERVICE)$(RESET)"
+	@mkdir -p $(SERVICES_DIR)/$(SERVICE)
+	@mkdir -p $(LOGS_DIR)/$(SERVICE)
+	@$(call generate_plist,$(SERVICE))
+	@echo "$(GREEN)✓ Service $(SERVICE) configured$(RESET)"
+	@echo "  Run 'make install SERVICE=$(SERVICE)' to register with launchctl"
+
+setup-secrets:
+	@echo "$(CYAN)Setting up secrets in macOS Keychain...$(RESET)"
+	@read -p "Anthropic API Key: " key && \
+		security add-generic-password -a botarmy -s ANTHROPIC_API_KEY -w "$$key" -U
+	@echo "$(GREEN)✓ Secrets stored in Keychain$(RESET)"
+
+# ============================================================
+# Build Commands
+# ============================================================
+
+build:
+	@$(call require_service)
+	@$(call detect_and_build,$(SERVICE))
+
+build-all:
+	@echo "$(CYAN)Building all services...$(RESET)"
+	@for svc in $(ALL_SERVICES); do \
+		echo "$(YELLOW)Building $$svc...$(RESET)"; \
+		$(MAKE) build SERVICE=$$svc || echo "$(RED)✗ Failed: $$svc$(RESET)"; \
+	done
+
+# Internal: detect service type and build accordingly
+define detect_and_build
+	@if echo "$(ELIXIR_SERVICES)" | grep -qw "$(1)"; then \
+		$(MAKE) _build_elixir SERVICE=$(1); \
+	elif echo "$(GO_SERVICES)" | grep -qw "$(1)"; then \
+		$(MAKE) _build_go SERVICE=$(1); \
+	else \
+		echo "$(RED)Unknown service: $(1)$(RESET)"; exit 1; \
+	fi
+endef
+
+_build_elixir:
+	@$(call require_service)
+	@echo "$(CYAN)Building Elixir service: $(SERVICE)$(RESET)"
+	@if [ ! -d "$(DEV_DIR)/$(SERVICE)" ]; then \
+		echo "$(RED)✗ Dev directory not found: $(DEV_DIR)/$(SERVICE)$(RESET)"; exit 1; \
+	fi
+	@cd $(DEV_DIR)/$(SERVICE) && \
+		echo "$(YELLOW)→ Fetching dependencies...$(RESET)" && \
+		MIX_ENV=prod mix deps.get --only prod && \
+		echo "$(YELLOW)→ Compiling...$(RESET)" && \
+		MIX_ENV=prod mix compile && \
+		echo "$(YELLOW)→ Building release...$(RESET)" && \
+		MIX_ENV=prod mix release --overwrite
+	@echo "$(GREEN)✓ Build complete: $(SERVICE)$(RESET)"
+
+_build_go:
+	@$(call require_service)
+	@echo "$(CYAN)Building Go service: $(SERVICE)$(RESET)"
+	@if [ ! -d "$(DEV_DIR)/$(SERVICE)" ]; then \
+		echo "$(RED)✗ Dev directory not found: $(DEV_DIR)/$(SERVICE)$(RESET)"; exit 1; \
+	fi
+	@cd $(DEV_DIR)/$(SERVICE) && \
+		echo "$(YELLOW)→ Downloading modules...$(RESET)" && \
+		go mod download && \
+		echo "$(YELLOW)→ Building binary...$(RESET)" && \
+		go build -ldflags="-s -w" -o $(SERVICES_DIR)/$(SERVICE)/$(SERVICE) .
+	@echo "$(GREEN)✓ Build complete: $(SERVICE)$(RESET)"
+
+# ============================================================
+# Install / Uninstall (launchctl registration)
+# ============================================================
+
+install:
+	@$(call require_service)
+	@echo "$(CYAN)Installing $(SERVICE) as LaunchAgent...$(RESET)"
+	@if [ ! -f "$(LAUNCH_AGENTS)/$(LABEL_PREFIX).$(SERVICE).plist" ]; then \
+		echo "$(RED)✗ Plist not found: $(LAUNCH_AGENTS)/$(LABEL_PREFIX).$(SERVICE).plist$(RESET)"; \
+		echo "  Run 'make setup-service SERVICE=$(SERVICE)' first"; \
+		exit 1; \
+	fi
+	@launchctl load $(LAUNCH_AGENTS)/$(LABEL_PREFIX).$(SERVICE).plist
+	@echo "$(GREEN)✓ Installed: $(SERVICE)$(RESET)"
+
+uninstall:
+	@$(call require_service)
+	@echo "$(YELLOW)Uninstalling $(SERVICE)...$(RESET)"
+	@launchctl unload $(LAUNCH_AGENTS)/$(LABEL_PREFIX).$(SERVICE).plist 2>/dev/null || true
+	@echo "$(GREEN)✓ Uninstalled: $(SERVICE)$(RESET)"
+
+reinstall:
+	@$(call require_service)
+	@$(MAKE) uninstall SERVICE=$(SERVICE)
+	@$(MAKE) install SERVICE=$(SERVICE)
+
+# ============================================================
+# Deploy (build + copy + restart)
+# ============================================================
+
+deploy:
+	@$(call require_service)
+	@echo "$(CYAN)╔════════════════════════════╗$(RESET)"
+	@echo "$(CYAN)║  Deploying: $(SERVICE)$(RESET)"
+	@echo "$(CYAN)╚════════════════════════════╝$(RESET)"
+	@$(MAKE) build SERVICE=$(SERVICE)
+	@$(MAKE) _copy_release SERVICE=$(SERVICE)
+	@$(MAKE) restart SERVICE=$(SERVICE)
+	@echo "$(GREEN)✓ Deployed: $(SERVICE)$(RESET)"
+
+deploy-all:
+	@echo "$(CYAN)Deploying all services...$(RESET)"
+	@for svc in $(ALL_SERVICES); do \
+		echo ""; \
+		$(MAKE) deploy SERVICE=$$svc || echo "$(RED)✗ Failed: $$svc$(RESET)"; \
+	done
+	@echo ""
+	@$(MAKE) status
+
+_copy_release:
+	@$(call require_service)
+	@if echo "$(ELIXIR_SERVICES)" | grep -qw "$(SERVICE)"; then \
+		echo "$(YELLOW)→ Copying Elixir release...$(RESET)"; \
+		cp -r $(DEV_DIR)/$(SERVICE)/_build/prod/rel/$(SERVICE)/* \
+			$(SERVICES_DIR)/$(SERVICE)/; \
+	fi
+	@echo "$(GREEN)✓ Files copied$(RESET)"
+
+# ============================================================
+# Service Control
+# ============================================================
+
+start:
+	@$(call require_service)
+	@echo "$(CYAN)Starting $(SERVICE)...$(RESET)"
+	@launchctl start $(LABEL_PREFIX).$(SERVICE)
+	@sleep 1
+	@$(MAKE) _check_running SERVICE=$(SERVICE)
+
+stop:
+	@$(call require_service)
+	@echo "$(YELLOW)Stopping $(SERVICE)...$(RESET)"
+	@launchctl stop $(LABEL_PREFIX).$(SERVICE)
+	@echo "$(GREEN)✓ Stopped: $(SERVICE)$(RESET)"
+
+restart:
+	@$(call require_service)
+	@echo "$(YELLOW)Restarting $(SERVICE)...$(RESET)"
+	@launchctl stop $(LABEL_PREFIX).$(SERVICE) 2>/dev/null || true
+	@sleep 2
+	@launchctl start $(LABEL_PREFIX).$(SERVICE)
+	@sleep 1
+	@$(MAKE) _check_running SERVICE=$(SERVICE)
+
+start-all:
+	@echo "$(CYAN)Starting all services...$(RESET)"
+	@for svc in $(ALL_SERVICES); do \
+		$(MAKE) start SERVICE=$$svc; \
+	done
+
+stop-all:
+	@echo "$(YELLOW)Stopping all services...$(RESET)"
+	@for svc in $(ALL_SERVICES); do \
+		$(MAKE) stop SERVICE=$$svc; \
+	done
+
+restart-all:
+	@echo "$(YELLOW)Restarting all services...$(RESET)"
+	@for svc in $(ALL_SERVICES); do \
+		$(MAKE) restart SERVICE=$$svc; \
+	done
+
+_check_running:
+	@$(call require_service)
+	@if launchctl list | grep -q "$(LABEL_PREFIX).$(SERVICE)"; then \
+		echo "$(GREEN)✓ Running: $(SERVICE)$(RESET)"; \
+	else \
+		echo "$(RED)✗ Failed to start: $(SERVICE)$(RESET)"; \
+		echo "  Check logs: make logs SERVICE=$(SERVICE)"; \
+	fi
+
+# ============================================================
+# Status & Health
+# ============================================================
+
+status:
+	@echo ""
+	@echo "$(CYAN)╔════════════════════════════════════════════╗$(RESET)"
+	@echo "$(CYAN)║           Bot Army - Status                ║$(RESET)"
+	@echo "$(CYAN)╚════════════════════════════════════════════╝$(RESET)"
+	@echo ""
+	@echo "$(YELLOW)Services:$(RESET)"
+	@for svc in $(ALL_SERVICES); do \
+		if launchctl list 2>/dev/null | grep -q "$(LABEL_PREFIX).$$svc"; then \
+			pid=$$(launchctl list 2>/dev/null | grep "$(LABEL_PREFIX).$$svc" | awk '{print $$1}'); \
+			if [ "$$pid" != "-" ] && [ -n "$$pid" ]; then \
+				echo "  $(GREEN)●$(RESET) $$svc (pid: $$pid)"; \
+			else \
+				echo "  $(RED)●$(RESET) $$svc (stopped/errored)"; \
+			fi; \
+		else \
+			echo "  $(YELLOW)○$(RESET) $$svc (not installed)"; \
+		fi; \
+	done
+	@echo ""
+	@echo "$(YELLOW)Infrastructure:$(RESET)"
+	@$(MAKE) _check_nats
+	@$(MAKE) _check_ollama_air
+	@$(MAKE) _check_ollama_mini
+	@echo ""
+
+_check_nats:
+	@if curl -sf http://localhost:8222/healthz > /dev/null 2>&1; then \
+		echo "  $(GREEN)●$(RESET) NATS (local)"; \
+	elif curl -sf http://$$MINI_IP:8222/healthz > /dev/null 2>&1; then \
+		echo "  $(GREEN)●$(RESET) NATS (mini - remote)"; \
+	else \
+		echo "  $(RED)●$(RESET) NATS (unreachable)"; \
+	fi
+
+_check_ollama_air:
+	@if curl -sf http://localhost:11434/api/tags > /dev/null 2>&1; then \
+		echo "  $(GREEN)●$(RESET) Ollama Air"; \
+	else \
+		echo "  $(RED)●$(RESET) Ollama Air (unreachable)"; \
+	fi
+
+_check_ollama_mini:
+	@MINI_IP=$$(cat $(HOME)/.config/botarmy/mini_ip 2>/dev/null || echo ""); \
+	if [ -n "$$MINI_IP" ] && curl -sf http://$$MINI_IP:11434/api/tags > /dev/null 2>&1; then \
+		echo "  $(GREEN)●$(RESET) Ollama Mini"; \
+	else \
+		echo "  $(YELLOW)●$(RESET) Ollama Mini (unreachable - degraded mode)"; \
+	fi
+
+health:
+	@echo "$(CYAN)Running health checks...$(RESET)"
+	@$(MAKE) status
+	@echo "$(YELLOW)Recent errors:$(RESET)"
+	@for svc in $(ALL_SERVICES); do \
+		if [ -f "$(LOGS_DIR)/$$svc/stderr.log" ]; then \
+			errors=$$(tail -n 50 $(LOGS_DIR)/$$svc/stderr.log | grep -c "error\|ERROR\|Error" || true); \
+			if [ "$$errors" -gt "0" ]; then \
+				echo "  $(RED)⚠$(RESET)  $$svc: $$errors errors in last 50 lines"; \
+			fi; \
+		fi; \
+	done
+
+# ============================================================
+# Logs
+# ============================================================
+
+logs:
+	@$(call require_service)
+	@echo "$(CYAN)Tailing logs for $(SERVICE) (Ctrl+C to stop)...$(RESET)"
+	@tail -f $(LOGS_DIR)/$(SERVICE)/stdout.log
+
+logs-err:
+	@$(call require_service)
+	@echo "$(CYAN)Tailing error logs for $(SERVICE) (Ctrl+C to stop)...$(RESET)"
+	@tail -f $(LOGS_DIR)/$(SERVICE)/stderr.log
+
+logs-all:
+	@echo "$(CYAN)Tailing all logs (Ctrl+C to stop)...$(RESET)"
+	@tail -f $(LOGS_DIR)/*/stdout.log
+
+logs-recent:
+	@$(call require_service)
+	@echo "$(CYAN)Last 50 lines for $(SERVICE):$(RESET)"
+	@tail -n 50 $(LOGS_DIR)/$(SERVICE)/stdout.log
+
+# ============================================================
+# Pause / Resume Controls (via NATS)
+# ============================================================
+
+pause:
+	@$(call require_service)
+	@echo "$(YELLOW)Pausing domain: $(SERVICE)$(RESET)"
+	@nats pub system.pause.$(SERVICE) '{"reason":"manual","timestamp":"$(shell date -u +%Y-%m-%dT%H:%M:%SZ)"}' \
+		|| echo "$(RED)✗ NATS not available$(RESET)"
+	@echo "$(GREEN)✓ Pause signal sent: $(SERVICE)$(RESET)"
+
+resume:
+	@$(call require_service)
+	@echo "$(GREEN)Resuming domain: $(SERVICE)$(RESET)"
+	@nats pub system.resume.$(SERVICE) '{"timestamp":"$(shell date -u +%Y-%m-%dT%H:%M:%SZ)"}' \
+		|| echo "$(RED)✗ NATS not available$(RESET)"
+	@echo "$(GREEN)✓ Resume signal sent: $(SERVICE)$(RESET)"
+
+pause-all:
+	@echo "$(RED)⚠  Pausing ALL services...$(RESET)"
+	@nats pub system.pause.all '{"reason":"manual","timestamp":"$(shell date -u +%Y-%m-%dT%H:%M:%SZ)"}' \
+		|| echo "$(RED)✗ NATS not available$(RESET)"
+	@echo "$(GREEN)✓ Global pause sent$(RESET)"
+
+resume-all:
+	@echo "$(GREEN)Resuming ALL services...$(RESET)"
+	@nats pub system.resume.all '{"timestamp":"$(shell date -u +%Y-%m-%dT%H:%M:%SZ)"}' \
+		|| echo "$(RED)✗ NATS not available$(RESET)"
+	@echo "$(GREEN)✓ Global resume sent$(RESET)"
+
+pause-llm:
+	@echo "$(YELLOW)Pausing all LLM requests...$(RESET)"
+	@nats pub system.pause.llm '{"reason":"manual","timestamp":"$(shell date -u +%Y-%m-%dT%H:%M:%SZ)"}' \
+		|| echo "$(RED)✗ NATS not available$(RESET)"
+	@echo "$(GREEN)✓ LLM pause sent$(RESET)"
+
+resume-llm:
+	@echo "$(GREEN)Resuming LLM requests...$(RESET)"
+	@nats pub system.resume.llm '{"timestamp":"$(shell date -u +%Y-%m-%dT%H:%M:%SZ)"}' \
+		|| echo "$(RED)✗ NATS not available$(RESET)"
+	@echo "$(GREEN)✓ LLM resume sent$(RESET)"
+
+pause-claude:
+	@echo "$(YELLOW)Pausing Claude API calls (cost control)...$(RESET)"
+	@nats pub system.pause.llm.claude \
+		'{"reason":"manual cost control","timestamp":"$(shell date -u +%Y-%m-%dT%H:%M:%SZ)"}' \
+		|| echo "$(RED)✗ NATS not available$(RESET)"
+
+resume-claude:
+	@echo "$(GREEN)Resuming Claude API calls...$(RESET)"
+	@nats pub system.resume.llm.claude \
+		'{"timestamp":"$(shell date -u +%Y-%m-%dT%H:%M:%SZ)"}' \
+		|| echo "$(RED)✗ NATS not available$(RESET)"
+
+killswitch:
+	@echo "$(RED)⚠  ⚠  ⚠  KILLSWITCH ACTIVATED ⚠  ⚠  ⚠$(RESET)"
+	@read -p "Are you sure? Type YES to confirm: " confirm && \
+		[ "$$confirm" = "YES" ] && \
+		nats pub risk.killswitch \
+			'{"reason":"manual killswitch","timestamp":"$(shell date -u +%Y-%m-%dT%H:%M:%SZ)"}' \
+		|| echo "Killswitch cancelled"
+
+# ============================================================
+# NATS Utilities
+# ============================================================
+
+nats-status:
+	@echo "$(CYAN)NATS Status:$(RESET)"
+	@nats server info 2>/dev/null || echo "$(RED)NATS not reachable$(RESET)"
+
+nats-monitor:
+	@echo "$(CYAN)Monitoring NATS subjects (Ctrl+C to stop)...$(RESET)"
+	@nats sub ">" 
+
+nats-monitor-system:
+	@echo "$(CYAN)Monitoring system subjects (Ctrl+C to stop)...$(RESET)"
+	@nats sub "system.>"
+
+nats-monitor-llm:
+	@echo "$(CYAN)Monitoring LLM subjects (Ctrl+C to stop)...$(RESET)"
+	@nats sub "llm.>"
+
+nats-streams:
+	@echo "$(CYAN)JetStream streams:$(RESET)"
+	@nats stream ls 2>/dev/null || echo "$(RED)JetStream not available$(RESET)"
+
+nats-kv:
+	@echo "$(CYAN)NATS KV buckets:$(RESET)"
+	@nats kv ls 2>/dev/null || echo "$(RED)NATS KV not available$(RESET)"
+
+# ============================================================
+# Helper Functions
+# ============================================================
+
+define require_service
+	@if [ -z "$(SERVICE)" ]; then \
+		echo "$(RED)✗ SERVICE is required$(RESET)"; \
+		echo "  Usage: make $(MAKECMDGOALS) SERVICE=<service_name>"; \
+		echo "  Available: $(ALL_SERVICES)"; \
+		exit 1; \
+	fi
+endef
+
+# ============================================================
+# Plist Generation
+# ============================================================
+
+define generate_plist
+	@cat > $(LAUNCH_AGENTS)/$(LABEL_PREFIX).$(1).plist << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>$(LABEL_PREFIX).$(1)</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>$(SERVICES_DIR)/$(1)/bin/$(1)</string>
+        <string>start</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>MIX_ENV</key>
+        <string>prod</string>
+        <key>HOME</key>
+        <string>$(HOME)</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ThrottleInterval</key>
+    <integer>5</integer>
+    <key>StandardOutPath</key>
+    <string>$(LOGS_DIR)/$(1)/stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>$(LOGS_DIR)/$(1)/stderr.log</string>
+    <key>WorkingDirectory</key>
+    <string>$(SERVICES_DIR)/$(1)</string>
+</dict>
+</plist>
+EOF
+endef
+
+.PHONY: help setup setup-service setup-secrets \
+	build build-all _build_elixir _build_go \
+	install uninstall reinstall \
+	deploy deploy-all _copy_release \
+	start stop restart start-all stop-all restart-all \
+	status health _check_running _check_nats _check_ollama_air _check_ollama_mini \
+	logs logs-err logs-all logs-recent \
+	pause resume pause-all resume-all pause-llm resume-llm \
+	pause-claude resume-claude killswitch \
+	nats-status nats-monitor nats-monitor-system nats-monitor-llm \
+	nats-streams nats-kv

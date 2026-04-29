@@ -106,8 +106,8 @@ Your Elixir bot army is ready! Here's what we built:
 │ 🌟 NEXT STEPS                                                    │
 ├──────────────────────────────────────────────────────────────────┤
 │ Phase 1: Add AI Intelligence                                     │
-│   □ Integrate Claude API for PonderingBot                        │
-│   □ Integrate Ollama for Orchestrator                            │
+│   □ Integrate Ollama for PonderingBot                        │
+│   □ Integrate Claude API for Orchestrator                            │
 │                                                                  │
 │ Phase 2: Add Persistence                                         │
 │   □ Connect to Postgres                                          │

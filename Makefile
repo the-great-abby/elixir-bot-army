@@ -6,7 +6,7 @@ IMAGE ?= $(REGISTRY)/bot-army:latest
 K8S_NAMESPACE ?= bot-army
 K8S_DIR = deploy/kubernetes
 
-.PHONY: help deps get nats start-nats run start iex test format compile clean reset-nats check
+.PHONY: help deps get nats start-nats run start iex test format compile clean reset-nats check push-and-publish
 .PHONY: docker-build docker-push docker-run docker-show-base-image k8s-deploy k8s-deploy-nats k8s-deploy-app k8s-destroy
 
 # Default target: show help
@@ -114,3 +114,7 @@ k8s-destroy:
 
 # Common typo
 k8s-destory: k8s-destroy
+
+
+push-and-publish:
+	@git push && $(MAKE) publish-release

@@ -4,7 +4,7 @@ defmodule BotArmy.MixProject do
   def project do
     [
       app: :bot_army,
-      version: "0.1.0",
+      version: "0.1.1",
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -37,7 +37,8 @@ defmodule BotArmy.MixProject do
     [
       {:gnat, "~> 1.8"},
       {:jason, "~> 1.4"},
-      {:postgrex, "~> 0.17"}
+      {:postgrex, "~> 0.17"},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
   end
 end

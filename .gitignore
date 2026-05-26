@@ -25,3 +25,7 @@ bot_army-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+
+# Build artifacts
+*.tar.gz
+*.tar.xz

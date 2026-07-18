@@ -1,5 +1,7 @@
 defmodule BotArmyTest do
   use ExUnit.Case
+  @moduletag :core
+
   doctest BotArmy
 
   test "greets the world" do

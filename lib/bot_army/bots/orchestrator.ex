@@ -30,34 +30,35 @@ defmodule BotArmy.Bots.Orchestrator do
       Logger.info("#{bot_name()} subscribed to: #{pattern}")
     end)
 
-    {:ok, %{
-      gnat: gnat,
-      events_processed: 0,
-      recent_events: [],
-      insights: []
-    }}
+    {:ok,
+     %{
+       gnat: gnat,
+       events_processed: 0,
+       recent_events: [],
+       insights: []
+     }}
   end
 
   @impl GenServer
   def handle_info({:msg, %{topic: _topic, body: body}}, state) do
     case BotArmy.Event.decode(body) do
       {:ok, event} ->
-        new_state = cond do
-          # Track insights specially
-          String.starts_with?(event.subject, "ponder.insight") ->
+        new_state =
+          if String.starts_with?(event.subject, "ponder.insight") do
             Logger.info("🎯 Orchestrator captured insight: #{inspect(event.data)}")
-            %{state |
-              insights: [event | state.insights] |> Enum.take(50),
-              events_processed: state.events_processed + 1
-            }
 
-          # Track all events for context
-          true ->
-            %{state |
-              recent_events: [event | state.recent_events] |> Enum.take(500),
-              events_processed: state.events_processed + 1
+            %{
+              state
+              | insights: [event | state.insights] |> Enum.take(50),
+                events_processed: state.events_processed + 1
             }
-        end
+          else
+            %{
+              state
+              | recent_events: [event | state.recent_events] |> Enum.take(500),
+                events_processed: state.events_processed + 1
+            }
+          end
 
         {:noreply, new_state}
 
@@ -68,7 +69,8 @@ defmodule BotArmy.Bots.Orchestrator do
   end
 
   @impl BotArmy.Bot
-  def handle_event(_event), do: :ok  # Handled in handle_info
+  # Handled in handle_info
+  def handle_event(_event), do: :ok
 
   # Public API for queries
 
@@ -135,9 +137,11 @@ defmodule BotArmy.Bots.Orchestrator do
 
   @impl GenServer
   def handle_call({:get_events, pattern}, _from, state) do
-    matching = Enum.filter(state.recent_events, fn event ->
-      matches_pattern?(event.subject, pattern)
-    end)
+    matching =
+      Enum.filter(state.recent_events, fn event ->
+        matches_pattern?(event.subject, pattern)
+      end)
+
     {:reply, matching, state}
   end
 
@@ -150,6 +154,7 @@ defmodule BotArmy.Bots.Orchestrator do
       event_types: count_event_types(state.recent_events),
       latest_insight: List.first(state.insights)
     }
+
     {:reply, summary, state}
   end
 
@@ -170,16 +175,27 @@ defmodule BotArmy.Bots.Orchestrator do
       String.contains?(String.downcase(question), "insight") ->
         "I've detected #{length(state.insights)} insights. #{format_insights(state.insights)}"
 
-      String.contains?(String.downcase(question), "health") or String.contains?(String.downcase(question), "sre") ->
-        sre_events = Enum.filter(state.recent_events, fn e -> String.starts_with?(e.subject, "sre") end)
+      String.contains?(String.downcase(question), "health") or
+          String.contains?(String.downcase(question), "sre") ->
+        sre_events =
+          Enum.filter(state.recent_events, fn e -> String.starts_with?(e.subject, "sre") end)
+
         "I see #{length(sre_events)} SRE events. System appears to be running normally."
 
-      String.contains?(String.downcase(question), "finance") or String.contains?(String.downcase(question), "spending") ->
-        finance_events = Enum.filter(state.recent_events, fn e -> String.starts_with?(e.subject, "finance") end)
+      String.contains?(String.downcase(question), "finance") or
+          String.contains?(String.downcase(question), "spending") ->
+        finance_events =
+          Enum.filter(state.recent_events, fn e -> String.starts_with?(e.subject, "finance") end)
+
         "I've tracked #{length(finance_events)} financial events recently."
 
-      String.contains?(String.downcase(question), "trading") or String.contains?(String.downcase(question), "market") ->
-        trading_events = Enum.filter(state.recent_events, fn e -> String.starts_with?(e.subject, "trading") or String.starts_with?(e.subject, "market") end)
+      String.contains?(String.downcase(question), "trading") or
+          String.contains?(String.downcase(question), "market") ->
+        trading_events =
+          Enum.filter(state.recent_events, fn e ->
+            String.starts_with?(e.subject, "trading") or String.starts_with?(e.subject, "market")
+          end)
+
         "I see #{length(trading_events)} trading/market events."
 
       true ->
@@ -188,8 +204,10 @@ defmodule BotArmy.Bots.Orchestrator do
   end
 
   defp format_insights([]), do: ""
+
   defp format_insights(insights) do
     latest = List.first(insights)
+
     if latest && latest.data do
       "Latest: #{Map.get(latest.data, "description", "N/A")}"
     else

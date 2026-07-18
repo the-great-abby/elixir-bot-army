@@ -6,8 +6,8 @@ IMAGE ?= $(REGISTRY)/bot-army:latest
 K8S_NAMESPACE ?= bot-army
 K8S_DIR = deploy/kubernetes
 
-.PHONY: help deps get nats start-nats run start iex test format compile clean reset-nats check push-and-publish
-.PHONY: docker-build docker-push docker-run docker-show-base-image k8s-deploy k8s-deploy-nats k8s-deploy-app k8s-destroy
+.PHONY: help deps get nats start-nats run start iex test format compile clean reset-nats check push-and-publish bump-version
+.PHONY: docker-build docker-push docker-run docker-show-base-image k8s-deploy k8s-deploy-nats k8s-deploy-app k8s-destroy bump-version
 
 # Default target: show help
 help:
@@ -38,7 +38,7 @@ help:
 
 # Dependencies
 deps get:
-	mix deps.get
+	$(MIX) deps.get
 
 # NATS
 nats start-nats:
@@ -50,16 +50,16 @@ run start iex:
 
 # Test & format
 test:
-	mix test
+	$(MIX) test
 
 format:
-	mix format
+	$(MIX) format
 
 compile:
-	mix compile
+	$(MIX) compile
 
 clean:
-	mix clean
+	$(MIX) clean
 
 # Stop and remove NATS container (from QUICKSTART)
 reset-nats:
@@ -69,9 +69,9 @@ reset-nats:
 
 # CI-style check: compile, verify format, test
 check:
-	mix compile --warnings-as-errors
-	mix format --check-formatted
-	mix test
+	$(MIX) compile --warnings-as-errors
+	$(MIX) format --check-formatted
+	$(MIX) test
 
 # --- Docker (single-host) ---
 # Elixir base image: auto from script when building, or set ELIXIR_BASE=tag to override
@@ -118,3 +118,10 @@ k8s-destory: k8s-destroy
 
 push-and-publish:
 	@git push && $(MAKE) publish-release
+
+bump-version:
+	@if [ -z "$(BUMP)" ]; then echo "Usage: make bump-version BUMP=major|minor|patch"; exit 1; fi
+	@OLD=$$(grep 'version:' mix.exs | head -1 | sed -E 's/.*version: "([^"]+)".*/\1/'); \
+	bash $(SCRIPTS_DIRECTORY)/bump_version.sh mix.exs $(BUMP) > /dev/null; \
+	NEW=$$(grep 'version:' mix.exs | head -1 | sed -E 's/.*version: "([^"]+)".*/\1/'); \
+	echo "✓ Bumped: $$OLD → $$NEW"
